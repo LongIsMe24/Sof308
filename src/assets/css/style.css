@@ -1,0 +1,66 @@
+:root {
+  --color-primary-brown: #6f4e37; /* Nâu Chủ Đạo */
+  --color-accent-tan: #a47e53; /* Nâu Vàng Accent */
+  --color-text-dark: #333;
+  --color-text-light: #555;
+  --color-bg-light: #faf8f4; /* Trắng Kem */
+  --color-white: #ffffff;
+  --color-border-light: #e0e0e0;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--color-bg-light);
+  color: var(--color-text-dark);
+  overflow-x: hidden;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+.card {
+  padding: 2em;
+}
+
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.page-container {
+  background-color: var(--color-white);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  margin: 20px auto;
+  max-width: 1400px;
+  padding: 0;
+}
+@media (min-width: 1200px) {
+  .page-container {
+    margin: 40px auto;
+    width: calc(100% - 80px);
+  }
+}
