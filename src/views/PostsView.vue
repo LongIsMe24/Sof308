@@ -334,6 +334,7 @@ import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { usePostStore } from "@/stores/post";
+import { getAllData, addData } from "@/utils/indexedDB";
 
 // --- STATE MANAGEMENT ---
 const route = useRoute();
@@ -413,9 +414,10 @@ const currentPost = computed(() => {
 });
 
 // --- DATA LOADING & WATCHERS ---
-onMounted(() => {
-  authStore.initializeAuth();
-  loadDataFromStorage();
+onMounted(async () => {
+  await authStore.initializeAuth();
+  await loadDataFromStorage();
+  await migrateCommentsFromLocalStorage();
   updateStateFromUrl();
 });
 
@@ -443,9 +445,11 @@ watch(
   { immediate: true }
 );
 
-function loadDataFromStorage() {
-  postStore.fetchPosts(); // Fetch all posts into the store
-  allUsers.value = JSON.parse(localStorage.getItem("horizone_users")) || [];
+async function loadDataFromStorage() {
+  await postStore.fetchPosts(); // Fetch all posts into the store
+  // Assuming authStore will be updated to expose all users
+  // For now, we'll keep the old way, and update it later.
+  allUsers.value = await getAllData("users") || [];
 }
 
 function updateStateFromUrl() {
@@ -511,15 +515,14 @@ function resetPostForm() {
 }
 
 // --- COMMENTS ---
-function loadComments(postId) {
-  const allComments =
-    JSON.parse(localStorage.getItem("horizone_comments")) || [];
+async function loadComments(postId) {
+  const allComments = await getAllData("comments");
   comments.value = allComments
     .filter((c) => String(c.postId) === String(postId))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
-function addComment() {
+async function addComment() {
   if (!currentUser.value) {
     alert("Vui lòng đăng nhập để bình luận.");
     return;
@@ -539,13 +542,27 @@ function addComment() {
     createdAt: new Date().toISOString(),
   };
 
-  const allComments =
-    JSON.parse(localStorage.getItem("horizone_comments")) || [];
-  allComments.push(newComment);
-  localStorage.setItem("horizone_comments", JSON.stringify(allComments));
+  await addData("comments", newComment);
 
   newCommentContent.value = "";
-  loadComments(state.currentPostId);
+  await loadComments(state.currentPostId);
+}
+
+async function migrateCommentsFromLocalStorage() {
+  const oldComments = JSON.parse(localStorage.getItem("horizone_comments")) || [];
+  if (oldComments.length > 0) {
+    try {
+      const commentsInDb = await getAllData("comments");
+      if (commentsInDb.length === 0) {
+        for (const comment of oldComments) {
+          await addData("comments", comment);
+        }
+      }
+      // localStorage.removeItem("horizone_comments");
+    } catch (error) {
+      console.error("Failed to migrate comments:", error);
+    }
+  }
 }
 
 // --- POSTS ---
@@ -603,29 +620,22 @@ async function savePost() {
     }
   }
 
-  const allPosts = JSON.parse(localStorage.getItem("horizone_posts")) || [];
-
   if (isEditMode.value) {
-    const postIndex = allPosts.findIndex(
-      (p) => String(p.id) === String(state.currentPostId)
-    );
-    if (postIndex > -1) {
-      allPosts[postIndex] = {
-        ...allPosts[postIndex],
-        title: postForm.title,
-        content: postForm.content,
-        imageUrl: imageUrlToSave,
-        updatedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("horizone_posts", JSON.stringify(allPosts));
-      loadDataFromStorage();
-      alert("Cập nhật bài viết thành công!");
-      navigateTo("detail", state.currentPostId);
-    }
+    const updatedPost = {
+      ...currentPost.value,
+      title: postForm.title,
+      content: postForm.content,
+      imageUrl: imageUrlToSave,
+      updatedAt: new Date().toISOString(),
+    };
+    await postStore.updatePost(updatedPost);
+    alert("Cập nhật bài viết thành công!");
+    navigateTo("detail", updatedPost.id);
+
   } else {
     const userDetails =
       allUsers.value.find((u) => u.email === currentUser.value.email) || {};
-        const newPost = {
+    const newPost = {
       id: Date.now() + '_' + Math.random().toString(36).substring(2, 9),
       title: postForm.title,
       imageUrl: imageUrlToSave,
@@ -634,17 +644,7 @@ async function savePost() {
       authorName: userDetails.name || currentUser.value.email.split("@")[0],
       createdAt: new Date().toISOString(),
     };
-    allPosts.push(newPost);
-        try {
-      localStorage.setItem("horizone_posts", JSON.stringify(allPosts));
-    } catch (e) {
-      alert(
-        "Lỗi: Không thể lưu bài viết. Bộ nhớ của trình duyệt có thể đã đầy. Vui lòng xóa bớt các bài viết cũ hoặc ảnh có dung lượng lớn và thử lại."
-      );
-      console.error("Lỗi khi lưu vào localStorage:", e);
-      return; // Dừng thực thi nếu không lưu được
-    }
-    loadDataFromStorage();
+    await postStore.addPost(newPost);
     alert("Đăng bài viết thành công!");
     navigateTo("detail", newPost.id);
   }
