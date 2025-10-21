@@ -59,7 +59,7 @@
           </div>
         </div>
       </div>
-      <div v-else class="text-center py-5">
+       <div v-else class="text-center py-5">
         <p v-if="searchQuery" class="text-muted">
           Không tìm thấy bài viết nào phù hợp với tìm kiếm của bạn.
         </p>
@@ -67,6 +67,36 @@
           Chưa có bài viết nào. Hãy là người đầu tiên tạo bài viết!
         </p>
       </div>
+
+      <!-- Pagination -->
+      <nav
+        v-if="totalPages > 1"
+        aria-label="Page navigation"
+        class="d-flex justify-content-center mt-5"
+      >
+        <ul class="pagination">
+          <li class="page-item" :class="{ disabled: currentPage === 1 }">
+            <a class="page-link" href="#" @click.prevent="changePage(currentPage - 1)"
+              >Trước</a
+            >
+          </li>
+          <li
+            v-for="page in totalPages"
+            :key="page"
+            class="page-item"
+            :class="{ active: page === currentPage }"
+          >
+            <a class="page-link" href="#" @click.prevent="changePage(page)">{{
+              page
+            }}</a>
+          </li>
+          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+            <a class="page-link" href="#" @click.prevent="changePage(currentPage + 1)"
+              >Sau</a
+            >
+          </li>
+        </ul>
+      </nav>
     </section>
 
     <!-- Chế độ xem chi tiết bài viết -->
@@ -299,8 +329,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from "vue";
+import { reactive, onMounted, computed, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { usePostStore } from "@/stores/post";
 
@@ -310,12 +341,19 @@ const router = useRouter();
 const authStore = useAuthStore();
 const postStore = usePostStore();
 
+const {
+  posts,
+  searchQuery,
+  paginatedPosts,
+  currentPage,
+  totalPages,
+} = storeToRefs(postStore);
+
 const state = reactive({
   currentView: "list", // 'list', 'detail', 'editor'
   currentPostId: null,
 });
 
-const posts = ref([]);
 const allUsers = ref([]);
 const comments = ref([]);
 const newCommentContent = ref("");
@@ -329,24 +367,44 @@ const postForm = reactive({
 
 // --- COMPUTED PROPERTIES ---
 const currentUser = computed(() => authStore.currentUser);
-const searchQuery = computed(() => postStore.searchQuery);
 const isEditMode = computed(
   () => state.currentPostId && state.currentView === "editor"
 );
 
 const filteredPosts = computed(() => {
-  if (!searchQuery.value) {
-    return posts.value;
+  const query = searchQuery.value.toLowerCase();
+  if (!query) {
+    return paginatedPosts.value;
   }
-  return posts.value.filter(
-    (post) =>
-      post.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      post.content.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+
+  const removeAccents = (str) => {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  };
+
+  const normalizedQuery = removeAccents(query);
+
+  // Search all posts, not just paginated ones
+  const allFiltered = posts.value.filter((post) => {
+    const normalizedTitle = removeAccents(post.title);
+    const normalizedContent = removeAccents(post.content);
+    return (
+      normalizedTitle.includes(normalizedQuery) ||
+      normalizedContent.includes(normalizedQuery)
+    );
+  });
+
+  // Then paginate the search results
+  const startIndex = (currentPage.value - 1) * postStore.postsPerPage;
+  const endIndex = startIndex + postStore.postsPerPage;
+  return allFiltered.slice(startIndex, endIndex);
 });
 
 const currentPost = computed(() => {
   if (state.currentPostId) {
+    // Search from the full list of posts in the store
     return posts.value.find(
       (p) => String(p.id) === String(state.currentPostId)
     );
@@ -386,25 +444,45 @@ watch(
 );
 
 function loadDataFromStorage() {
-  posts.value = JSON.parse(localStorage.getItem("horizone_posts")) || [];
-  posts.value.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  postStore.fetchPosts(); // Fetch all posts into the store
   allUsers.value = JSON.parse(localStorage.getItem("horizone_users")) || [];
 }
 
 function updateStateFromUrl() {
-  const { view, postId } = route.query;
+  const { view, postId, page } = route.query;
   state.currentView = view || "list";
   state.currentPostId = postId || null;
+  postStore.setCurrentPage(parseInt(page, 10) || 1);
 
   if (state.currentView === "editor" && !state.currentPostId) {
     resetPostForm();
   }
 }
 
+// --- PAGINATION ---
+function changePage(page) {
+  if (page > 0 && page <= totalPages.value) {
+    // Update the store's current page
+    postStore.setCurrentPage(page);
+    // Update the URL query parameter
+    const query = { ...route.query, page: page };
+    if (page === 1) {
+      delete query.page; // Clean URL for the first page
+    }
+    router.push({ query });
+  }
+}
+
 // ---NAVIGATION ---
 function navigateTo(view, postId = null) {
   const query = {};
-  if (view && view !== "list") query.view = view;
+  if (view && view !== "list") {
+    query.view = view;
+  } else {
+    // When navigating back to list, reset page to 1
+    postStore.setCurrentPage(1);
+  }
+
   if (postId) query.postId = postId;
 
   router.push({ name: "Posts", query });
@@ -547,8 +625,8 @@ async function savePost() {
   } else {
     const userDetails =
       allUsers.value.find((u) => u.email === currentUser.value.email) || {};
-    const newPost = {
-      id: Date.now(),
+        const newPost = {
+      id: Date.now() + '_' + Math.random().toString(36).substring(2, 9),
       title: postForm.title,
       imageUrl: imageUrlToSave,
       content: postForm.content,
@@ -557,7 +635,15 @@ async function savePost() {
       createdAt: new Date().toISOString(),
     };
     allPosts.push(newPost);
-    localStorage.setItem("horizone_posts", JSON.stringify(allPosts));
+        try {
+      localStorage.setItem("horizone_posts", JSON.stringify(allPosts));
+    } catch (e) {
+      alert(
+        "Lỗi: Không thể lưu bài viết. Bộ nhớ của trình duyệt có thể đã đầy. Vui lòng xóa bớt các bài viết cũ hoặc ảnh có dung lượng lớn và thử lại."
+      );
+      console.error("Lỗi khi lưu vào localStorage:", e);
+      return; // Dừng thực thi nếu không lưu được
+    }
     loadDataFromStorage();
     alert("Đăng bài viết thành công!");
     navigateTo("detail", newPost.id);
