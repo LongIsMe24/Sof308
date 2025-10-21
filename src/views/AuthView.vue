@@ -12,6 +12,15 @@
     <h2 class="text-center">{{ isLoginMode ? "Đăng Nhập" : "Đăng Ký" }}</h2>
 
     <form @submit.prevent="handleAuthSubmit" class="mt-4">
+      <div v-if="!isLoginMode" class="mb-3">
+        <label for="authName" class="form-label">Tên</label>
+        <input
+          type="text"
+          class="form-control"
+          v-model="form.name"
+          required
+        />
+      </div>
       <div class="mb-3">
         <label for="authEmail" class="form-label">Email</label>
         <input
@@ -73,6 +82,7 @@ const authStore = useAuthStore();
 
 const mode = ref("login");
 const form = ref({
+  name: "",
   email: "",
   password: "",
   confirmPassword: "",
@@ -86,26 +96,32 @@ onMounted(() => {
   if (authStore.isLoggedIn) {
     authStore.logout();
   }
-  mode.value = route.query.mode || "login";
+  updateView(route.query);
 });
 
 // Cập nhật chế độ khi query URL thay đổi
 watch(
-  () => route.query.mode,
-  (newMode) => {
-    mode.value = newMode || "login";
-    message.value = { text: "", type: "" }; // Xóa thông báo khi chuyển chế độ
+  () => route.query,
+  (newQuery) => {
+    updateView(newQuery);
   }
 );
+
+function updateView(query) {
+  mode.value = query.mode || "login";
+  message.value = { text: "", type: "" }; // Xóa thông báo khi chuyển chế độ
+  if (query.registered === "true") {
+    message.value = { text: "Đăng ký thành công! Vui lòng đăng nhập.", type: "success" };
+  }
+}
 
 function toggleAuthMode() {
   const newMode = isLoginMode.value ? "signup" : "login";
   router.push({ name: "Auth", query: { mode: newMode } });
 }
 
-function handleAuthSubmit() {
+async function handleAuthSubmit() {
   message.value = { text: "", type: "" };
-  const users = JSON.parse(localStorage.getItem("horizone_users")) || [];
 
   if (!isLoginMode.value) {
     // Chế độ Đăng ký
@@ -116,29 +132,21 @@ function handleAuthSubmit() {
       };
       return;
     }
-    if (users.find((user) => user.email === form.value.email)) {
-      message.value = {
-        text: "Lỗi: Email này đã được đăng ký.",
-        type: "error",
-      };
-      return;
+
+    const result = await authStore.register(
+      form.value.name,
+      form.value.email,
+      form.value.password
+    );
+
+    if (result.success) {
+      router.push({ name: "Auth", query: { mode: "login", registered: "true" } });
+    } else {
+      message.value = { text: result.message, type: "error" };
     }
-
-    // Thêm người dùng mới
-    users.push({
-      email: form.value.email,
-      password: form.value.password,
-      displayName: form.value.email.split("@")[0],
-    });
-    localStorage.setItem("horizone_users", JSON.stringify(users));
-
-    // Chuyển sang chế độ đăng nhập và báo thành công
-    router.push({ name: "Auth", query: { mode: "login" } });
-    // Tạm thời không hiển thị message thành công vì sẽ bị xóa ngay khi route thay đổi
-    // Để hiển thị, cần dùng state management phức tạp hơn hoặc query params
   } else {
     // Chế độ Đăng nhập
-    const success = authStore.login(form.value.email, form.value.password);
+    const success = await authStore.login(form.value.email, form.value.password);
     if (success) {
       router.push({ name: "Posts" });
     } else {

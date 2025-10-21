@@ -75,12 +75,13 @@ export const useAuthStore = defineStore("auth", () => {
     if (oldUsers.length > 0) {
       try {
         const usersInDb = await getAllData("users");
-        if (usersInDb.length === 0) {
-          for (const user of oldUsers) {
+        const usersInDbEmails = new Set(usersInDb.map(u => u.email));
+        for (const user of oldUsers) {
+          if (!usersInDbEmails.has(user.email)) {
             await addData("users", user);
           }
         }
-        // Optional: Remove from localStorage after successful migration
+        // Optional: Clear after successful migration
         // localStorage.removeItem("horizone_users");
       } catch (error) {
         console.error("Failed to migrate users:", error);

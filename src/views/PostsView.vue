@@ -553,11 +553,13 @@ async function migrateCommentsFromLocalStorage() {
   if (oldComments.length > 0) {
     try {
       const commentsInDb = await getAllData("comments");
-      if (commentsInDb.length === 0) {
-        for (const comment of oldComments) {
+      const commentsInDbIds = new Set(commentsInDb.map(c => c.id));
+      for (const comment of oldComments) {
+        if (!commentsInDbIds.has(comment.id)) {
           await addData("comments", comment);
         }
       }
+      // Optional: Clear after successful migration
       // localStorage.removeItem("horizone_comments");
     } catch (error) {
       console.error("Failed to migrate comments:", error);

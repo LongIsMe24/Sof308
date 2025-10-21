@@ -52,12 +52,14 @@ export const usePostStore = defineStore("post", () => {
     if (oldPosts.length > 0) {
       try {
         const postsInDb = await getAllData("posts");
-        if (postsInDb.length === 0) {
-          for (const post of oldPosts) {
+        const postsInDbIds = new Set(postsInDb.map(p => p.id));
+        for (const post of oldPosts) {
+          if (!postsInDbIds.has(post.id)) {
             await addData("posts", post);
           }
         }
-        // localStorage.removeItem("horizone_posts");
+        // Optional: Clear after successful migration
+        // if (postsInDb.length === 0) localStorage.removeItem("horizone_posts");
       } catch (error) {
         console.error("Failed to migrate posts:", error);
       }
