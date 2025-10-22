@@ -72,4 +72,16 @@ async function clearStore(storeName) {
     });
 }
 
-export { openDB, addData, getAllData, clearStore };
+async function deleteData(storeName, key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+    const request = store.delete(key);
+
+    request.onsuccess = () => resolve();
+    request.onerror = (event) => reject("Error deleting data: " + event.target.error);
+  });
+}
+
+export { openDB, addData, getAllData, clearStore, deleteData };

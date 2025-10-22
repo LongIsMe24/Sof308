@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { addData, getAllData } from "@/utils/indexedDB";
+import { addData, getAllData, deleteData } from "@/utils/indexedDB";
 
 export const usePostStore = defineStore("post", () => {
   const searchQuery = ref("");
@@ -82,6 +82,11 @@ export const usePostStore = defineStore("post", () => {
     await fetchPosts();
   }
 
+  async function deletePost(postId) {
+    await deleteData("posts", postId);
+    await fetchPosts();
+  }
+
   return {
     searchQuery,
     posts,
@@ -94,5 +99,6 @@ export const usePostStore = defineStore("post", () => {
     setCurrentPage,
     addPost,
     updatePost,
+    deletePost,
   };
 });

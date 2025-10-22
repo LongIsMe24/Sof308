@@ -147,8 +147,11 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { usePostStore } from "@/stores/post";
+import { deleteData } from "@/utils/indexedDB";
 
 const authStore = useAuthStore();
+const postStore = usePostStore();
 
 const profileForm = ref(null);
 const passwordForm = reactive({ current: "", new: "", confirm: "" });
@@ -171,20 +174,19 @@ const avatarPreview = computed(() => {
   return ""; // Default or placeholder
 });
 
-onMounted(() => {
+onMounted(async () => {
   if (authStore.currentUser) {
-    // Tạo một bản sao để chỉnh sửa, tránh thay đổi trực tiếp store
     profileForm.value = { ...authStore.currentUser };
     if (!profileForm.value.displayName) {
       profileForm.value.displayName = profileForm.value.email.split("@")[0];
     }
-    loadUserPosts();
+    await loadUserPosts();
   }
 });
 
-function loadUserPosts() {
-  const allPosts = JSON.parse(localStorage.getItem("horizone_posts")) || [];
-  userPosts.value = allPosts
+async function loadUserPosts() {
+  await postStore.fetchPosts();
+  userPosts.value = postStore.posts
     .filter((p) => p.authorEmail === authStore.currentUser.email)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
@@ -202,7 +204,7 @@ function handleAvatarChange(event) {
     newAvatarDataUrl.value = e.target.result;
   };
   reader.readAsDataURL(file);
-  const maxSizeInBytes = 1 * 1024 * 1024; // 1MB cho avatar là hợp lý
+  const maxSizeInBytes = 1 * 1024 * 1024; // 1MB for avatar is reasonable
   if (file.size > maxSizeInBytes) {
     alert("Lỗi: Kích thước ảnh đại diện quá lớn! Vui lòng chọn ảnh dưới 1MB.");
     event.target.value = null;
@@ -225,7 +227,6 @@ function handleProfileUpdate() {
 
   let userToUpdate = users[userIndex];
 
-  // Xử lý đổi mật khẩu
   if (passwordForm.current || passwordForm.new || passwordForm.confirm) {
     if (userToUpdate.password !== passwordForm.current) {
       message.value = {
@@ -248,20 +249,16 @@ function handleProfileUpdate() {
     userToUpdate.password = passwordForm.new;
   }
 
-  // Cập nhật thông tin
   userToUpdate.displayName = profileForm.value.displayName;
   if (newAvatarDataUrl.value) {
     userToUpdate.avatarUrl = newAvatarDataUrl.value;
   }
 
-  // Lưu lại
   users[userIndex] = userToUpdate;
   localStorage.setItem("horizone_users", JSON.stringify(users));
 
-  // Cập nhật store của Pinia
   authStore.currentUser = { ...userToUpdate };
 
-  // Cập nhật lại tên tác giả trong các bài viết của họ
   let posts = JSON.parse(localStorage.getItem("horizone_posts")) || [];
   posts.forEach((post) => {
     if (post.authorEmail === authStore.currentUser.email) {
@@ -276,16 +273,19 @@ function handleProfileUpdate() {
   passwordForm.confirm = "";
 }
 
-function deletePost(postId) {
+async function deletePost(postId) {
   if (
     confirm(
       "Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không thể hoàn tác."
     )
   ) {
-    let posts = JSON.parse(localStorage.getItem("horizone_posts")) || [];
-    posts = posts.filter((p) => p.id !== postId);
-    localStorage.setItem("horizone_posts", JSON.stringify(posts));
-    loadUserPosts(); // Tải lại danh sách bài viết
+    try {
+      await deleteData('posts', postId);
+      await loadUserPosts();
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      alert("Lỗi: Không thể xóa bài viết.");
+    }
   }
 }
 </script>
