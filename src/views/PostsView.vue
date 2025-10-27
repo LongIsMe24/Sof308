@@ -358,6 +358,7 @@ const state = reactive({
 const allUsers = ref([]);
 const comments = ref([]);
 const newCommentContent = ref("");
+const notification = ref("");
 
 const postForm = reactive({
   title: "",
@@ -453,10 +454,18 @@ async function loadDataFromStorage() {
 }
 
 function updateStateFromUrl() {
-  const { view, postId, page } = route.query;
+  const { view, postId, page, loggedIn } = route.query;
   state.currentView = view || "list";
   state.currentPostId = postId || null;
   postStore.setCurrentPage(parseInt(page, 10) || 1);
+
+  if (loggedIn === "true") {
+    notification.value = "Đăng nhập thành công!";
+    // Create a new query object without 'loggedIn'
+    const newQuery = { ...route.query };
+    delete newQuery.loggedIn;
+    router.replace({ query: newQuery });
+  }
 
   if (state.currentView === "editor" && !state.currentPostId) {
     resetPostForm();

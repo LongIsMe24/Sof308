@@ -1,30 +1,24 @@
 import { createRouter, createWebHistory } from "vue-router";
-import HomePage from "@/views/HomePage.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
-      name: "Home",
-      component: HomePage,
+      name: "Auth",
+      component: () => import("@/views/AuthView.vue"),
     },
     {
       path: "/posts",
       name: "Posts",
-      // Lazy load component
       component: () => import("@/views/PostsView.vue"),
+      meta: { requiresAuth: true },
     },
     {
       path: "/profile",
       name: "Profile",
       component: () => import("@/views/ProfileView.vue"),
       meta: { requiresAuth: true },
-    },
-    {
-      path: "/auth",
-      name: "Auth",
-      component: () => import("@/views/AuthView.vue"),
     },
   ],
 });
@@ -38,13 +32,20 @@ router.beforeEach(async (to, from, next) => {
   // Nếu store chưa được khởi tạo, hãy chạy hàm initializeAuth()
   // Điều này đảm bảo nó chỉ chạy một lần khi cần.
   if (!authStore.isInitialized) {
-    authStore.initializeAuth();
+    await authStore.initializeAuth();
   }
 
-  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
-    next({ name: "Auth", query: { mode: "login" } }); // Redirect to login if auth is required and user is not logged in
+  const isAuthenticated = authStore.isLoggedIn;
+
+  if (to.name === 'Auth' && isAuthenticated) {
+    // Nếu đã đăng nhập, chuyển hướng khỏi trang Auth
+    next({ name: 'Posts' });
+  } else if (to.meta.requiresAuth && !isAuthenticated) {
+    // Nếu route yêu cầu đăng nhập và chưa đăng nhập, chuyển hướng tới trang Auth
+    next({ name: 'Auth' });
   } else {
-    next(); // Continue to the route
+    // Cho phép điều hướng
+    next();
   }
 });
 

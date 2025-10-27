@@ -1,6 +1,6 @@
 <template>
   <header class="main-header">
-    <router-link :to="{ name: 'Home' }" class="header-logo">Blong</router-link>
+    <router-link :to="{ name: 'Posts' }" class="header-logo">Blong</router-link>
 
     <nav class="header-nav d-none d-lg-block me-auto">
       <ul>
@@ -70,7 +70,7 @@
               <a
                 class="dropdown-item text-danger"
                 href="#"
-                @click.prevent="auth.logout"
+                @click.prevent="handleLogout"
                 >Đăng Xuất</a
               >
             </li>
@@ -91,6 +91,11 @@ const auth = useAuthStore();
 const postStore = usePostStore();
 const searchQuery = ref(postStore.searchQuery);
 const router = useRouter();
+
+const handleLogout = () => {
+  auth.logout();
+  router.push({ name: "Auth" });
+};
 
 watch(searchQuery, (newValue) => {
   postStore.setSearchQuery(newValue);

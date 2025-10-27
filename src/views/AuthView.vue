@@ -2,7 +2,7 @@
   <div class="auth-container">
     <div class="text-center mb-4">
       <router-link
-        :to="{ name: 'Home' }"
+        :to="{ name: 'Posts' }"
         class="h1 text-decoration-none"
         style="color: var(--color-primary-brown)"
       >
@@ -91,14 +91,6 @@ const message = ref({ text: "", type: "" });
 
 const isLoginMode = computed(() => mode.value === "login");
 
-onMounted(() => {
-  // Xóa phiên đăng nhập cũ khi vào trang auth
-  if (authStore.isLoggedIn) {
-    authStore.logout();
-  }
-  updateView(route.query);
-});
-
 // Cập nhật chế độ khi query URL thay đổi
 watch(
   () => route.query,
@@ -148,7 +140,7 @@ async function handleAuthSubmit() {
     // Chế độ Đăng nhập
     const success = await authStore.login(form.value.email, form.value.password);
     if (success) {
-      router.push({ name: "Posts" });
+      router.push({ name: 'Posts', query: { loggedIn: 'true' } });
     } else {
       message.value = {
         text: "Lỗi: Email hoặc mật khẩu không chính xác.",

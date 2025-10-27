@@ -1,6 +1,5 @@
 import { ref, computed } from "vue";
 import { defineStore } from "pinia";
-import router from "@/router";
 import { addData, getAllData } from "@/utils/indexedDB";
 
 export const useAuthStore = defineStore("auth", () => {
@@ -67,7 +66,6 @@ export const useAuthStore = defineStore("auth", () => {
   function logout() {
     sessionStorage.removeItem("horizone_currentUser");
     currentUser.value = null;
-    router.push({ name: "Home" }).then(() => window.location.reload());
   }
 
   async function migrateUsersFromLocalStorage() {
