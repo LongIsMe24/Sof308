@@ -87,6 +87,16 @@ export const usePostStore = defineStore("post", () => {
     await fetchPosts();
   }
 
+  async function updateAuthorNameForPosts(authorEmail, newDisplayName) {
+    const allPosts = await getAllData("posts");
+    for (const post of allPosts) {
+      if (post.authorEmail === authorEmail) {
+        post.authorName = newDisplayName;
+        await addData("posts", post);
+      }
+    }
+  }
+
   return {
     searchQuery,
     posts,
@@ -100,5 +110,6 @@ export const usePostStore = defineStore("post", () => {
     addPost,
     updatePost,
     deletePost,
+    updateAuthorNameForPosts,
   };
 });

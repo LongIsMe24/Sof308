@@ -5,12 +5,12 @@
       <div
         class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5"
       >
-        <h1 class="mb-3 mb-md-0 fw-bold">Tất Cả Bài Viết</h1>
+        <h1 class="mb-3 mb-md-0 fw-bold">Tất Cả Blog</h1>
         <button
           @click="navigateTo('editor', null)"
           class="btn btn-action rounded-pill px-4 py-2"
         >
-          <i class="fas fa-plus me-2"></i>Tạo Bài Viết Mới
+          <i class="fas fa-plus me-2"></i>Tạo Blog Mới
         </button>
       </div>
 
@@ -59,7 +59,7 @@
           </div>
         </div>
       </div>
-       <div v-else class="text-center py-5">
+      <div v-else class="text-center py-5">
         <p v-if="searchQuery" class="text-muted">
           Không tìm thấy bài viết nào phù hợp với tìm kiếm của bạn.
         </p>
@@ -76,7 +76,10 @@
       >
         <ul class="pagination">
           <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <a class="page-link" href="#" @click.prevent="changePage(currentPage - 1)"
+            <a
+              class="page-link"
+              href="#"
+              @click.prevent="changePage(currentPage - 1)"
               >Trước</a
             >
           </li>
@@ -90,8 +93,14 @@
               page
             }}</a>
           </li>
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <a class="page-link" href="#" @click.prevent="changePage(currentPage + 1)"
+          <li
+            class="page-item"
+            :class="{ disabled: currentPage === totalPages }"
+          >
+            <a
+              class="page-link"
+              href="#"
+              @click.prevent="changePage(currentPage + 1)"
               >Sau</a
             >
           </li>
@@ -342,13 +351,8 @@ const router = useRouter();
 const authStore = useAuthStore();
 const postStore = usePostStore();
 
-const {
-  posts,
-  searchQuery,
-  paginatedPosts,
-  currentPage,
-  totalPages,
-} = storeToRefs(postStore);
+const { posts, searchQuery, paginatedPosts, currentPage, totalPages } =
+  storeToRefs(postStore);
 
 const state = reactive({
   currentView: "list", // 'list', 'detail', 'editor'
@@ -450,7 +454,7 @@ async function loadDataFromStorage() {
   await postStore.fetchPosts(); // Fetch all posts into the store
   // Assuming authStore will be updated to expose all users
   // For now, we'll keep the old way, and update it later.
-  allUsers.value = await getAllData("users") || [];
+  allUsers.value = (await getAllData("users")) || [];
 }
 
 function updateStateFromUrl() {
@@ -558,11 +562,12 @@ async function addComment() {
 }
 
 async function migrateCommentsFromLocalStorage() {
-  const oldComments = JSON.parse(localStorage.getItem("horizone_comments")) || [];
+  const oldComments =
+    JSON.parse(localStorage.getItem("horizone_comments")) || [];
   if (oldComments.length > 0) {
     try {
       const commentsInDb = await getAllData("comments");
-      const commentsInDbIds = new Set(commentsInDb.map(c => c.id));
+      const commentsInDbIds = new Set(commentsInDb.map((c) => c.id));
       for (const comment of oldComments) {
         if (!commentsInDbIds.has(comment.id)) {
           await addData("comments", comment);
@@ -642,12 +647,11 @@ async function savePost() {
     await postStore.updatePost(updatedPost);
     alert("Cập nhật bài viết thành công!");
     navigateTo("detail", updatedPost.id);
-
   } else {
     const userDetails =
       allUsers.value.find((u) => u.email === currentUser.value.email) || {};
     const newPost = {
-      id: Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+      id: Date.now() + "_" + Math.random().toString(36).substring(2, 9),
       title: postForm.title,
       imageUrl: imageUrlToSave,
       content: postForm.content,

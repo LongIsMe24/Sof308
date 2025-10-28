@@ -148,7 +148,7 @@
 import { ref, reactive, onMounted, computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { usePostStore } from "@/stores/post";
-import { deleteData } from "@/utils/indexedDB";
+import { addData, deleteData } from "@/utils/indexedDB";
 
 const authStore = useAuthStore();
 const postStore = usePostStore();
@@ -212,21 +212,17 @@ function handleAvatarChange(event) {
   }
 }
 
-function handleProfileUpdate() {
+async function handleProfileUpdate() {
   message.value = { text: "", type: "" };
 
-  let users = JSON.parse(localStorage.getItem("horizone_users")) || [];
-  const userIndex = users.findIndex(
-    (u) => u.email === authStore.currentUser.email
-  );
-
-  if (userIndex === -1) {
+  if (!authStore.currentUser) {
     message.value = { text: "Lỗi: Không tìm thấy người dùng.", type: "error" };
     return;
   }
 
-  let userToUpdate = users[userIndex];
+  let userToUpdate = { ...authStore.currentUser };
 
+  // Handle password change
   if (passwordForm.current || passwordForm.new || passwordForm.confirm) {
     if (userToUpdate.password !== passwordForm.current) {
       message.value = {
@@ -249,28 +245,38 @@ function handleProfileUpdate() {
     userToUpdate.password = passwordForm.new;
   }
 
+  // Handle profile info change
   userToUpdate.displayName = profileForm.value.displayName;
   if (newAvatarDataUrl.value) {
     userToUpdate.avatarUrl = newAvatarDataUrl.value;
   }
 
-  users[userIndex] = userToUpdate;
-  localStorage.setItem("horizone_users", JSON.stringify(users));
+  try {
+    // Update user in IndexedDB
+    await addData("users", userToUpdate);
 
-  authStore.currentUser = { ...userToUpdate };
+    // Update user in the auth store
+    authStore.currentUser = { ...userToUpdate };
 
-  let posts = JSON.parse(localStorage.getItem("horizone_posts")) || [];
-  posts.forEach((post) => {
-    if (post.authorEmail === authStore.currentUser.email) {
-      post.authorName = userToUpdate.displayName;
-    }
-  });
-  localStorage.setItem("horizone_posts", JSON.stringify(posts));
+    // Update author name in all of the user's posts
+    await postStore.updateAuthorNameForPosts(
+      userToUpdate.email,
+      userToUpdate.displayName
+    );
+    await loadUserPosts(); // Refresh the list of user posts
 
-  message.value = { text: "Cập nhật hồ sơ thành công!", type: "success" };
-  passwordForm.current = "";
-  passwordForm.new = "";
-  passwordForm.confirm = "";
+    message.value = { text: "Cập nhật hồ sơ thành công!", type: "success" };
+    passwordForm.current = "";
+    passwordForm.new = "";
+    passwordForm.confirm = "";
+    newAvatarDataUrl.value = null; // Clear the temporary avatar
+  } catch (error) {
+    console.error("Failed to update profile:", error);
+    message.value = {
+      text: "Lỗi: Không thể cập nhật hồ sơ.",
+      type: "error",
+    };
+  }
 }
 
 async function deletePost(postId) {
